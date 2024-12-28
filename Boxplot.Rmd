@@ -1,0 +1,235 @@
+---
+title: "The Mighty Boxplot"
+author: "Edgar Derricho"
+date: "2024-12-26"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Datasets:
+
+Analyzing Exam Scores: https://www.kaggle.com/datasets/sudhanshu2198/analyzing-exam-scores
+
+Description: This dataset contains information on students in primary and secondary schools inclding gender, race/ethnicity, parent education level, lunch (free/reduced lunch or standard lunch), whether the student took the test preparation score and their final exam score in their math class.
+
+- Make a Table of Parameters
+## -------------------------
+
+Housing Prices in London:
+https://www.kaggle.com/datasets/arnavkulkarni/housing-prices-in-london
+
+Description: Comprises of various house listings in london and neighbouring regions.
+
+- Make a Table of Parameters
+
+## -------------------------
+
+Salary Prediction Dataset:
+https://www.kaggle.com/datasets/rkiattisak/salaly-prediction-for-beginer
+
+Description: This dataset contains information about the salaries of employees at a company.
+
+- Make a table of Parameters
+## -------------------------
+
+## Import Datasets
+```{r}
+library(readxl)
+AnalyzingExamScores <- read_excel("userDirectory")
+HousingPricesLondon <- read_excel("userDirectory")
+SalaryPredictionData <- read_excel("userDirectory")
+```
+# ------------------------------------------------------------------------
+# -------------------------- Article -------------------------------------
+# ------------------------------------------------------------------------
+
+# Title: The Boxplot: A powerful tool for Exploring Data
+
+
+# What is a boxplot
+
+Let us start with the basics. Many of us have seen the boxplot and all of its splendor. A boxplot visually summarizes the central tendency, variability, and skewness of a dataset, using its quartiles The boxplot is also called a box-and-whisker plot. 
+
+## Central Tendencies
+
+Central tendencies provide a summary measure that represents the center or typical value of a data set. The first quartile, third quartile, and median of the box plot represents central tendencies.
+
+The median represents the overall central tendency of the dataset. If we split this data along the median, the first quartile represents the median of 50% of the data while the third quartile represents the median of the second 50% of the data.
+
+## Skewness
+
+Skewness is a measure of the asymmetry in the distribution of data. It indicates whether the data values are more concentrated on one side of the center compared to the other. We will observe this attribute by looking at boxplots of two randomly generated datasets.
+
+```{r}
+# Boxplot with Normally Distributed Variable
+x = rnorm(50,0,5)
+# Boxplot with Exponentially Distributed Variable (Skewed Example)
+y = rexp(50,rate = 0.35)
+boxplot(y,x,main="Boxplot of Two Datasets",col = c("gray","orange"),horizontal=T)
+```
+
+Observe the symmetry of the orange boxplot. The median is located in the center of the box and both whiskers have even length. This lets us know that the data are spread symmetrically about the median.
+
+Observe the grey boxplot. This boxplot has a smaller box, short lower whisker and longer upward whisker. This indicates that there are more data points in the lower range.
+
+## Spread
+
+The spread of the data describes how much the values in a dataset vary or are dispersed from one another and the center of the distribution. Think of the spread as the "width" of the data, this lets us know how closely packed the data are. Let us observe the boxplots of the salries of men and women with PhD's at an undisclosed company.
+
+```{r}
+# Males
+maleBach = SalaryPredictionData$Salary[which(SalaryPredictionData$`Education Level`=="PhD" & SalaryPredictionData$Gender=="Male")]
+
+# Female
+femaleBach = SalaryPredictionData$Salary[which(SalaryPredictionData$`Education Level`=="PhD" & SalaryPredictionData$Gender=="Female")]
+
+# Boxplot
+boxplot(maleBach,femaleBach, main="Comparison of Men and Women with PhD's at a Company", names=c("Men","Women"),col="orange",horizontal = T,outline=T)
+```
+
+When comparing the spread of the minimum (left whisker) and maximum (right whisker), we observe that the range is larger for men with PhDs than for women with the same degree at this company. Notice for women, the third qaurtile represents the max value not counting outliers. 
+
+Additionally, by examining the boxes, we see that the box, which represents the spread of the middle 50% of the data, is wider for men than for women. This indicates greater variation in the salaries of men with PhDs at this company compared to women with PhDs.
+
+# Uses of Boxplots
+
+This is where the ribber meets the road. When dealing with multivariate data, we can use boxplots to observe many qualities and relationships in one plot.
+
+## Comparison of Distributions
+
+When using boxplots, we can observe distributions of different variables in the same plot. Let us observe the salaries of people at a company who have bachelors, masters, and phds.
+
+```{r}
+bachSalary = SalaryPredictionData$Salary[which(SalaryPredictionData$`Education Level`=="Bachelor's")]
+mastersSalary = SalaryPredictionData$Salary[which(SalaryPredictionData$`Education Level`=="Master's")]
+phdSalary = SalaryPredictionData$Salary[which(SalaryPredictionData$`Education Level`=="PhD")]
+
+
+boxplot(bachSalary,mastersSalary,phdSalary,names = c("Bachelor's","Master's","PhDs"),main="Salaries of Degrees",col="orange")
+```
+
+By observing these boxplots together, we can see that the bachelor's degree has a larger spread, but is skewed toward the lower range. The Master's degree shows symmetry along its median. The PhD's salaries show a tiny spread compared to the others and many outliers. 
+
+## Data Visualisations Along Categories
+
+Boxplots do an amazing job of splitting data categories and showing the relationships between these categories. Let us observe Housing Prices in london vs number of total rooms:
+
+```{r}
+HousingPricesLondon$TotRooms = HousingPricesLondon$`No. of Bedrooms`+HousingPricesLondon$`No. of Bathrooms`+HousingPricesLondon$`No. of Receptions`
+boxplot(Price ~ TotRooms,data=HousingPricesLondon,col="orange", outline=F,main="Housing Prices in London by Numer of Rooms")
+```
+
+We can see that there is an upward trend in the price as the number of rooms increase. This is obvious, but observe the spread of the data as the number of rooms increase. There is a larger spread as the number of rooms increase. finally, we see that there is a nonlinear relationship between number of rooms and price. There appears to be a curve as the number of rooms increase.
+
+# ------------------------------------------------------------------------------
+# ----------------------- Ommited from Article ---------------------------------
+# ------------------------------------------------------------------------------
+
+Let us also observe boxplots of the price of houses by region of London
+```{r}
+# Define the locations
+city.county <- c("London", "Surrey", "Twickenham", "Holland Park", "Battersea", 
+               "Clapton", "Hertfordshire", "Middlesex", "Essex", "Downs Road", 
+               "Thurleigh Road", "E5 8DE", "De Beauvoir", "Wandsworth", 
+               "Clerkenwell", "Deptford", "Ealing", "Northwood", "Blackheath", 
+               "Fulham", "Richmond", "The Metal Works", "N7 6QX", 
+               "City Of London", "Chessington", "82-88 Fulham High Street", 
+               "Little Venice", "Spitalfields", "Fulham High Street", 
+               "27 Carlton Drive", "Fitzrovia", "Chelsea", "Marylebone", 
+               "52 Holloway Road", "Kent", "London1500", "Wornington Road", 
+               "Thames Ditton", "Watford", "Surrey Quays", 
+               "110 Battersea Park Road", "Bushey", "311 Goldhawk Road", 
+               "6 Deal Street", "Kensington", "Middx", "Lambourne End", 
+               "Romford", "Queens Park", "Richmond Hill", "4 Circus Road West", 
+               "Hornchurch", "N1 6FU", "Oxshott", "Greenford", "Wimbledon", 
+               "Lillie Square")
+
+# Define the region for each location
+regions <- c("Central", "South", "Southwest", "West", "Southwest", "East", 
+             "North", "Northwest", "East", "East", "Southwest", "East", 
+             "Central", "Southwest", "Central", "Southeast", "West", "Northwest", 
+             "Southeast", "Southwest", "Southwest", "Central", "North", "Central", 
+             "Southwest", "Southwest", "West", "East", "Southwest", "Southwest", 
+             "Central", "Central", "Central", "North", "South", "Central", 
+             "West", "Southwest", "Northwest", "Southeast", "West", "Central", 
+             "Central", "West", "North", "East", "East", "West", "Southwest", 
+             "West", "East", "Central", "Southwest", "West", "Southwest","East","Central")
+
+# Change to Abbreviations so Graph will Show All Regions
+regions <- c("Cen", "S", "SW", "W", "SW", "E", 
+             "N", "NW", "E", "E", "SW", "E", 
+             "Cen", "SW", "Cen", "SE", "W", "NW", 
+             "SE", "SW", "SW", "Cen", "N", "Cen", 
+             "SW", "SW", "W", "E", "SW", "SW", 
+             "Cen", "Cen", "Cen", "N", "S", "Cen", 
+             "W", "SW", "NW", "SE", "W", "Cen", 
+             "Cen", "W", "N", "E", "E", "W", "SW", 
+             "W", "E", "Cen", "SW", "W", "SW", "E", "Cen")
+
+# Create the dataframe
+location_data <- data.frame(
+  CityCounty = city.county,
+  Region = regions,
+  stringsAsFactors = FALSE
+)
+
+colnames(location_data) <- c("City/County","Region")
+
+# View the dataframe
+print(location_data)
+
+# Match the locations in the housing dataset with the location_data
+matched_data <- base::merge(HousingPricesLondon, location_data, by = "City/County", all.x = TRUE)
+
+# View the matched dataset
+print(matched_data)
+
+#View(matched_data)
+
+boxplot(Price ~ Region,data=matched_data,col="orange")
+```
+
+Let us observe these boxplots without outliers:
+```{r}
+boxplot(Price ~ Region,data=matched_data,col="orange",outline=FALSE)
+```
+
+Without outliers, we can have a better look at the price in each region. Observe the largest spread of prices is in the south where the most expensive houses are by the median.
+
+# ------------------------------------------------------------------------------
+# --------------------------------- In Article ---------------------------------
+# ------------------------------------------------------------------------------
+
+## ANOVA (For Advanced Users)
+
+This is for anyone who believes the boxplot is only for beginners. When observing the residual plots of linear regression models, analysis of variance (ANOVA) allows us to understand the fit of the model to our data.
+
+Observing a boxplot of model residuals can allow us to understand model fit at a glance. Let us observe the relationship between years of experience and salary versus the relationship between housing prices in London and area in sq feet.
+
+Scatterplot of Experience and Salary with Regression Line 
+```{r}
+plot(SalaryPredictionData$`Years of Experience`,SalaryPredictionData$Salary,main="Salary by Years of Experience",xlab="Years of Experience",ylab="Salary",col="orange",pch=16)
+model = lm(Salary ~ `Years of Experience`,data=SalaryPredictionData) # Regression Model
+abline(model) # Regression Line
+summary(model) # Summary to Find Adjusted R-Squared
+```
+
+Observing the scatterplot shows that there is a linear relationship between years of experience and salary.
+
+```{r}
+plot(HousingPricesLondon$`Area in sq ft`,HousingPricesLondon$Price,main="Housing Price by Area",col="orange",xlab="Area(sqft)",ylab="Price",pch=16)
+model2 = lm(Price ~ `Area in sq ft`,data=HousingPricesLondon) # Regression Model
+abline(model2) # Regression Line
+summary(model2) # Summary to Find Adjusted R-Squared
+```
+
+Observing the housing prices and area in square feet, we see that there is clustering around the lower values indicating a nonlinear relationship. (Housing prices are exponential when compared to many variables). The model residuals should be tighter (ie less spread) with the . We can check this by comparing the adjusted R squared values of the linear models.
+
+Let us observe the boxplots of the residuals of the models without outliers (Note: Since residuals are normalized, we can plot residual boxplots od nonralted models in the same window):
+```{r}
+boxplot(model$residuals,model2$residuals,outline = F,names = c("YearsExp vs. Salary (ARS: 0.86)","Housing Prices vs. Sq. Ft. (ARS: 0.44)"),main="Residual Boxplots",ylab="Residuals",col="orange",horizontal = F)
+```
+Observe the spread of the residuals of each model. Notice that the year esperience model has a substantially smaller spread. We can observe the Adjusted R squred of each model and observe that the years experience model has a better fit than the housing prices model.
