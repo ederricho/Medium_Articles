@@ -1,0 +1,186 @@
+---
+title: "Law of Large Numbers Article"
+author: "Edgar Derricho"
+date: "2025-01-22"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction
+
+The Law of Large Numbers (LLN) is one of the fundamental theorems in probability and statistics. It states that as the number of trials in an experiment increases, the observed average of the results will converge to the expected value. This concept underpins many practical applications, from financial forecasting to quality control in manufacturing. In this article, we'll explore the LLN through practical examples at different levels of complexity, demonstrating its power with real-world data.
+
+# Beginner Level
+
+Suppose you flip a fair coin. We know the chance of getting heads is 50%. If you flip it just 5 times, you might get 3 heads and 2 tails (60% heads 40% tails, not exactly 50%). However, if you flip this coin 1000 times, the number of heads and tails will be closer to 50% heads and 50% tails. Since none of us have the time to flip a coin 1000+ times, however, our friends at Kaggle.com have an unbiased coin flip dataset. Let us observe the percentages of heads/tails as experiments increase.
+
+```{r}
+# ---------- Import Data ----------
+library(readxl) # Import Package to Read Excel Files
+unbiased_coins_toss <- read_excel("C:/Users/EJ's/Downloads/archive (10)/unbiased_coins_toss.xlsx") # Dataset as Dataframe
+#View(unbiased_coins_toss) # View Dataframe (Optional)
+
+# -------------------- Percentages ---------------------------------
+toss <- unbiased_coins_toss$one_re_old # Experiments
+total <- length(toss) # Total Number of Experiments
+heads_percentage <- c() # Empty Vector for Percentage of Heads
+for(i in c(1:total)){
+  exp <- c(1:i) # Experiment
+  head_count <- length(which(toss[1:i]=="H")) # Count the Number of Heads
+  perc <- head_count/length(exp) # Percentage Heads
+  heads_percentage <- append(heads_percentage,perc) # Append List of Heads Percentages
+  #print(perc) # Print the Percentage (Optional)
+}
+
+# ---------- Plot Experiments ----------
+plot(heads_percentage,main="Heads Percentages", xlab="Number of Coin Flips", ylab="Percentage of Heads")
+```
+
+The more times you repeat an experiment, the closer your results will be to what is expected.
+
+Why the fluctuation in the percentage of heads before convergence?
+
+In small samples randomness plays a dominant role, causing the observed proportion to deviate significantly from the expected value. Also, in small samples, it is possible to have what is called a 'streak effect' where one outcome is overwhelmingly observed. Think of your favorite basketball player shooting 4/5 three pointers in the second quarter of a game where his game three pointer ration was 6/15. 
+
+# Intermediate Level
+
+Now, we will use some notation. Mathematically, the Law of Large Numbers states that as the number of trials $n$ increases, the sample average $\bar{X}_n$ approaches the population mean $mu$. Formally, if $X_1,X_2,...,X_n$ are independent, identically distributed (i.i.d.) random variables with expected value $E[X]=\mu$, then:
+
+$$\bar{X}_n=\frac{1}{n}\sum^{}_{}X_i \rightarrow \mu \text{ as }n \rightarrow \infty$$
+
+Let us observe the daily return of the Apple stock dataset.
+
+```{r}
+library(quantmod) # Stock Dataset R Package
+
+# ---------- Retrieve Data and Calculate Return ----------
+apple <- getSymbols('AAPL',src="yahoo",auto.assign = F) # Apple Stock Dataset
+apple_closing <- apple$AAPL.Close  # Closing Prices  
+return <- diff(log(apple_closing)) # Log Return
+true_mean <- mean(return,na.rm = T) # Mean of the Return
+
+# ---------- Sample of Different Sizes and Compute Means ----------
+sample_sizes <- c(10, 50, 100, 500, 1000)
+sample_means <- sapply(sample_sizes, function(size) {
+  mean(sample(return, size))
+})
+
+# ---------- Plot Results ----------
+plot(sample_sizes, sample_means, type = "b", col = "blue", pch = 19, xlab = "Sample Size", ylab = "Mean Return")
+abline(h = true_mean, col = "red", lty = 2)
+title("Law of Large Numbers in Stock Market Returns")
+
+print(true_mean)
+```
+
+We again see a fluctuation in return when the sample sizes are small. Quite often this fluctuation can be used to gain an advantage in the market, detect volatility or demolish an investment. 
+
+# Weak and Strong Laws of Probability
+
+Let us introduce the two forms of the Law of Large Numbers.
+
+## Weak Law of Large Numbers
+
+Convergence in Probability:
+$$P(|\bar{X}_n-\mu| \geq \epsilon) \rightarrow 0 \text{ as }n \rightarrow \infty$$
+
+This means that the probability of the sample mean deviating from the expected mean by any small amount $\epsilon$ shrinks to zero.
+
+Let us use the coin flipping experiment to analyze the weak law of large numbers. We will chose $\epsilon=0.05$
+```{r}
+# ---------- Necessary Values ----------
+perc_diff <- c()# Percent Difference Vector
+eps_percVec <- c() # Probability Vector
+mu <- 0.5 # Theoretical Percentage
+epsilon <- c(-0.05,0.05) # Epsilon Bounds
+sample_sizes <- seq(from=10,to=1200,by=5) # Increasing Sample Sizes
+
+# --------- Loop for Experiments ----------
+for(i in c(1:length(sample_sizes))){
+  experiment <- sample(toss,sample_sizes[i],replace = T) # Random Sampling of Coin Tosses
+  heads <- length(which(experiment=="H")) # Number of Heads
+  perc <- heads/sample_sizes[i] # Percentage of Heads
+  diff <- perc - mu # Difference of Sample and Theoretical Percentages
+  perc_diff = append(perc_diff,diff) # Append the Difference Vector
+  epsilon_perc <- length(which(diff<mu & diff> (-1*mu)))/length(experiment) # Probability Difference > elsilon
+  eps_percVec <- append(eps_percVec,epsilon_perc)
+}
+
+# ---------- Plot Results ----------
+plot(y=perc_diff,x=sample_sizes,main="Weak Law of Large Numbers",xlab="Sample Size",ylab="Difference") # Heads Percentages as the Sample Sizes Increase Plot
+abline(h = epsilon, col = c("red","red"), lty = 2) # Epsilon Bounds
+#plot(y=eps_percVec,x=sample_sizes) # Probability Convergence (Weak Law)
+
+```
+
+As the sample size increases, the percentage of heads stays within the bounds of $epsilon$.
+
+Let us also plot $P(|\bar{X}_n-\mu| \geq \epsilon)$
+```{r}
+plot(y=eps_percVec,x=sample_sizes,main="Probability of Diff > Epsilon",xlab="Sample Sizes",ylab="Probability") # Probability Convergence (Weak Law)
+```
+
+Observe the convergence of the probability that $P(|\bar{X}_n-\mu| \geq \epsilon)$ converges to 0 as the sample size increases.
+
+## Strong Law of Large Numbers
+
+Almost sure convergence:
+
+$$P(\lim_{x\to\infty} \bar{X}_n = \mu) = 1$$
+
+This implies that the sample mean converges to the expected value with probability 1.
+
+It is difficult to visualize or quantify "almost sure" convergence. Therefore, we will plot the sample means and their confidence intervals as the sample size increases to 'approximate' almost sure convergence. In theory, the confidence intervals will narrow, meaning the estimate is increasingly reliable (since the standard error decreases as the the sample size increases). 
+
+We will use the coin flip experiment for this demonstration at the 95% confidnce level. 
+
+Note: We can use normal approximation to get the z-value when sample sizes are large enough.
+```{r}
+# ---------- Empty Vectors and Sample Sizes ----------
+perc_heads <- c()# Percentage Heads Vector
+left_CI <- c() # Left CI Vector
+right_CI <- c() # Right CI Vector
+widthVec <- c() # Width Vector
+sample_sizes <- seq(from=30,to=1200,by=25) # Increasing Sample Sizes
+
+# ---------- Loop for Experiments ---------- 
+for(i in c(1:length(sample_sizes))){
+  experiment <- sample(toss,sample_sizes[i],replace = T) # Random Sampling of Coin Tosses
+  heads <- length(which(experiment=="H")) # Number of Heads
+  perc <- heads/sample_sizes[i] # Percentage of Heads
+  z_val <- 1.96 # 95% Confidence Level
+  se <- sqrt(perc*(1-perc)/length(experiment))# Standard Error
+  ci_left <- perc - se # Left confidence Interval
+  ci_right <- perc + se # Right Confidence Interval
+  perc_heads <- append(perc_heads,perc) # Append Percent Heads Vector
+  left_CI <- append(left_CI,ci_left) # Left Confidence Interval
+  right_CI <- append(right_CI,ci_right) # Right Confidence Interval
+  width <- ci_right - ci_left # Width of Confidence Interval
+  widthVec <- append(widthVec,width) # Append Width Vector
+}
+
+# ---------- Plot Results ----------
+plot(y=perc_heads,x=sample_sizes,main="Heads Percentages and Confidene Intervals",xlab="Sample Size",ylab="Percent Heads") # Plot Graph
+lines(y=left_CI,x=sample_sizes,lty = 3,col="blue") # Left CI
+lines(y=right_CI,x=sample_sizes, lty = 3,col="red") # Right CI
+#arrows(1:1200,left_CI,1:1200,right_CI,angle=90,code=3,col="green",length=0.05)
+plot(y=widthVec,x=sample_sizes,main="Confidence Interval Width",xlab="Sample Sizes",ylab="CI Width")
+```
+
+The confidence interval narrows as the sample size increases.
+
+One key difference between the strong law and the weak law is that the strong law guarantees convergence while the weak law merely says the probability approaches zero.
+
+# Conclusion
+
+The law of large numbers. It is important because it guarantee stable long-term results for the averages of some random events. This allows us to form more robust inferences about a population. In my Monte Carlo article, I discussed the importance of the Law of Large Numbers in Monte Carlo simulations. Where the law of large numbers becomes interesting is when there are experimental constraints. What is the budget of the experiment, how many trials are allowed, is it physically possible to conduct many experiments? Fortunately for us, we have computers that can simulate large number of experiments, but what about clinical trials that require real humans with rare diseases or conditions? How can you use the law of large numbers in your life. Where would the law of large numbers not be feasible?
+
+# References
+
+Coin Flip Dataset: https://www.kaggle.com/datasets/blurredmachine/unbiased-coin-toss-data/data
+
+https://www.investopedia.com/terms/l/lawoflargenumbers.asp
+
