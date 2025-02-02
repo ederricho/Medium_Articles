@@ -1,0 +1,308 @@
+---
+title: "The Dangers of Biased Sampling"
+output: html_document
+date: "2025-01-27"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# -------------------- Article --------------------
+
+# Introduction
+
+# Sample and Population
+
+In statistical studies, a population represents the whole group that you want to study. A sample is a subset of individuals that are members of the population. We often use the sample to make inferences about a population. There are four main types of sampling: simple random sampling, systematic sampling, stratified sampling, and cluster sampling. 
+
+- Simple Random Sampling: In a random sample, every member of the population has an equal chance of being selected. To conduct this type of sampling, you can use tools that utilize chance to select samples.
+
+- Systematic Sampling: Systematic sampling is similar to simple random sampling. The difference is how the sampling is conducted. Every member of the population is listed with a number, but instead of randomly generating numbers, individuals are chosen at regular intervals. 
+
+- Stratified Sampling: Stratified sampling involves dividing the population into subgroups that may differ in important ways. If done properly, this can ensure every subgroup of a population is represented in a given sample.
+
+- Cluster Sampling: Cluster sampling involves dividing the population into subgroups, but each subgroup should have similar characteristics to the whole sample. Here, we sample entire subgroups, not individuals.
+
+# The Law of Large Numbers
+
+To put it simply, the law of large numbers states that as the sample increases, the sample statistic tends to converge to the true population statistic, provided the sample is collected in an unbiased, representative manner.
+
+We will observe this by observing the mean and median house prices in the housing prices London dataset found on kaggle.com. We will use simple random sampling where we repeatedly sample random houses prices, increasing the sample size in each iteration.
+
+I will be using R for data analysis and visualizations in this article.
+
+Mean of Housing Prices
+```{r}
+# ---------- Import File ----------
+library(readxl) # Import Excel Reader Package
+library(kableExtra) # Package for Tables
+HousingLondon <- read_excel("C:/Users/EJ's/Downloads/archive (13)/HousingLondon.xlsx") # Save File as Data Frame
+#View(HousingLondon) # View Data Frame
+
+# ---------- Mean, Sample Sequence and Emptry Vector ----------
+prices <- HousingLondon$Price # Housing Prices Vector
+totPrices <- seq(from = 1, to = length(prices), by = 5) # Sequence for x-values in Plot 
+true_mean <- mean(prices) # Population Mean of Housing Prices
+meanVector <- c() # Empty Vector of Sample Means
+
+# ---------- Random Sampling ----------
+for(i in totPrices){
+  sample <- sample(prices,i,replace = TRUE) # Random Sample of Housing Prices
+  s_mean <- mean(sample) # Mean of Housing Prices Sample
+  meanVector <- append(meanVector, s_mean) # Append Sample Mean Vector
+}
+
+# ---------- Plot ----------
+plot(y = meanVector,
+     x = totPrices,
+     #pch = 19,
+     main = "Mean Price as Sample Size Increases",
+     xlab = "Sample Size",
+     ylab = "Mean Housing Price")
+abline(h = true_mean, lty = 2, col = "red")
+```
+Using simple random sampling, the mean of our samples tend toward the population mean as the sample size increases.
+
+Median of Housing Prices
+```{r}
+# ---------- Median and Empty Vector ----------
+true_median <- median(prices) # Population Mean of Housing Prices
+medianVector <- c() # Empty Vector of Sample Means
+
+# ---------- Random Sampling ----------
+for(i in totPrices){
+  sample <- sample(prices,i,replace = TRUE) # Random Sample of Housing Prices
+  s_median <- median(sample) # Mean of Housing Prices Sample
+  medianVector <- append(medianVector, s_median) # Append Sample Mean Vector
+}
+
+# ---------- Plot ----------
+plot(y = medianVector,
+     x = totPrices,
+     #pch = 19,
+     main = "Median Price as Sample Size Increases",
+     xlab = "Sample Size",
+     ylab = "Median Housing Price")
+abline(h = true_median, lty = 2, col = "red")
+```
+Using simple random sampling, the median of our samples tend toward the population median as the sample size increases.
+
+# The Imperfect world of Experimentation
+
+In a perfect world, we could sample every member of the population to obtain the true population statistic. However, in reality experimental constraints like money, time, and logistical limitations mean we must rely on samples. This is where the law of large numbers provides reassurance: with an adequately large sample size, we approach the true population statistic. But this is only true under the assumption of unbiased random sampling.
+
+# The Consequences of Biased Sampling
+
+Biased samples give us the wrong inference about a population. To illustrate this, we will introduce three different forms of bias into our sampling strategy. 
+
+## Bias in Proportion
+
+First, we will observe sampling disproportional to the proportions of the population. We will use the number of bedrooms as factor.
+
+Proportion of Houses with Each Bedroom
+```{r}
+# ---------- Necessary Data ----------
+houseType <- sort(unique(HousingLondon$`House Type`)) # Retrieving Unique House Types
+tot <- length(prices) # Total Number of Prices
+houseVec <- c() # Empty Vector for Proportions
+
+# ---------- Create Proportions ----------
+for(i in 1:length(houseType)){
+  val <- length(which(HousingLondon$`House Type`==houseType[i])) # Number of House Type
+  #cat(val,houseType[i]) # Print Type of House and Number
+  prop <- val/tot # Property Proportion
+  houseVec <- append(houseVec, prop) # Append Proportion Vector
+}
+
+# ---------- Proportion Table ----------
+proportion <- data.frame(houseType,houseVec) # Dataframe of Proportions
+colnames(proportion) <- c("Type of House", "Proportion") # Change Column Names
+#kable(proportion) # Table of Proportions (Simple Table)
+knitr::kable(proportion, caption = "House Type and Proportion") %>%
+  kable_styling(full_width = F, bootstrap_options = c("striped","hover","condensed"))
+
+```
+
+Suppose you had to make an inference about the mean and median housing prices in London and you could only use Zillow (we will not discuss the validity of Zillow prices here) which lists 200 houses. Suppose we left the proportion of the types of houses to chance.
+```{r}
+#install.packages("LaplacesDemon") # Install this Package for Dirichlet Distribution
+library(LaplacesDemon) # Package for Dirichlet Distribution for Random Proportions
+
+# ---------- Proportions ----------
+realProportions <- houseVec # True Proportions from Dataset
+randomProportions <- rdirichlet(1,rep(1,8))# Random Proportions for Sampling - Creates 9 Random Numbers that Add up to 1)
+
+# ---------- Sampling using Random Proportions ----------
+randomSizes <- round(randomProportions * 200,0) # Size of Each Sample
+trueSizes <- round(realProportions * 200,0) # Size of Each Sample Proportional to True Population
+randomHouse <- c() # Empty Vector for Random Proportion of Houses
+trueHouse <- c() # Empty Vector for True Proportion of Houses
+rand <- sample(prices, 200, replace = FALSE) # Mean of Random sample of 200 houses
+
+# ---------- Simulated Surveys ----------
+for(i in 1:length(houseType)){
+  house_indexes <- which(HousingLondon$`House Type` == houseType[i]) # Indexes
+  randSample <- sample(prices[house_indexes], randomSizes[i], replace = TRUE) # Random Sampling for Random Proportions
+  trueSample <- sample(prices[house_indexes], trueSizes[i], replace = TRUE) # Random Sampling for True Proportions
+  randomHouse <- append(randomHouse, randSample) # Append Vector
+  trueHouse <- append(trueHouse, trueSample) # Append Vector
+  
+}
+
+# ---------- Results ----------
+cat("Percent Difference of Mean of the Houses using Random Proportions to the True Mean: ", round(abs((mean(randomHouse) - true_mean)/true_mean),2) * 100, "%",
+    "\n",
+    "Percent Difference of Mean of the Houses using the True Proportion and the True Mean: ", round(abs((mean(trueHouse) - true_mean)/true_mean),2) * 100, "%", "\n",
+    "True Mean of the Population: ", true_mean)
+```
+
+Tables of Proportions
+```{r}
+p <- as.vector(randomProportions)
+df <- data.frame(houseType, p, realProportions)
+colnames(df) <- c("House Type", "Random Proportions", "True Proportions")
+#kable(df) # Simple Table
+knitr::kable(df, caption = "Proportions of House Type") %>%
+  kable_styling(full_width = F, bootstrap_options = c("striped","hover","condensed"))
+```
+
+
+Tables of Results
+```{r}
+df <- data.frame(prettyNum(abs(mean(randomHouse)),big.mark = ",", scientific = FALSE),
+                 prettyNum(abs(mean(trueHouse)), big.mark = ",", scientific = FALSE),
+                 prettyNum(mean(rand), big.mark = ",", scientific = FALSE))
+colnames(df) <- c("Mean Using Random Proportions",
+                  "Mean Using True Proportions",
+                  "True Mean of Random Sample")
+#kable(df) # Simple Table
+knitr::kable(df, caption = "Means of Samples") %>%
+  kable_styling(full_width = F, bootstrap_options = c("striped","hover","condensed"))
+```
+
+We see that using the proper proportions of the samples can greatly change the sample statistic. Bias in proportion can create large anomalies in sample statistics. Using the proper proportion allows us to have smaller sample sizes and have more accurate sample statistics.
+
+Let's observe histograms for each sample:
+```{r}
+hist(randomHouse, xlab = "Price", main = "Histogram of Sample of Random Proportions")
+hist(trueHouse, xlab = "Price", main = "Histogram of Sample of True Proportions")
+hist(rand, xlab = "Price", main = "Histogram of Random Sample")
+```
+
+Experiment: Each time this code is ran, it produces a random proportion vector whose sum equals 1. Try this code different times with different proportions and see how close you can get to the true mean.
+
+## Bias in Self-Selection
+
+Now we will discuss bias in selection. Suppose we surveyed 2000 people in the greater London area to find out the mean value of properties. Only 800 people from random locations in London answered the survey. Suppose wealthier people decided to avoid answering this survey for privacy reasons. How accurate would the results of the survey be? Let's run 1000 simulations where only 20% of the house values are $1000000 or more to observe the sample mean vs. the true mean. We will also compare this experiment to an unbiased random sample of 800 houses.
+```{r}
+iterations <- 1000 # Number of iterations of the survey
+wealthy <- 1000000 # Housing Price Floor of Wealthy Individuals  
+samplePricesMean <- c() # Empty Vector for Mean of Sample
+unbiasedRandomMean <- c() # Empty Vector for Unbiased Sample of 800
+
+# ---------- Conduct Experiment ----------
+for(i in 1:iterations){
+  ss_sampleWealthy <- sample(x = prices[prices < wealthy ], size = 640, replace = FALSE) # Wealthy Sample
+  ss_sampleNotWealthy <- sample(x = prices[prices >= wealthy ], size = 160, replace = FALSE) # Non Wealthy Sample
+  unbiasedSample <- sample(x = prices, size = 800, replace = FALSE) # Unbiased Survey 
+  full_sample <- c(ss_sampleNotWealthy, ss_sampleWealthy) # Concatenated Samples
+  samplePricesMean <- append(samplePricesMean, mean(full_sample)) # Append Vector with the Mean
+  unbiasedRandomMean <- append(unbiasedRandomMean, mean(unbiasedSample)) # Append Vector with Unbiased Sample Mean
+}
+
+# ---------- Plot Results ----------
+plot(samplePricesMean,
+     ylim = c(1000000, 2000000),
+     xlab = "Survey Index",
+     ylab = "Price",
+     main = "Self-Selection Bias Comparison") # Plot Mean
+points(unbiasedRandomMean,
+       col = "blue")
+abline(h = true_mean,
+       lty = 2,
+       col = "red") # True Mean Line
+legend("bottomright",
+       legend = c("Biased Sample", "Unbiased Sample", "True Mean"),
+       col = c("black", "blue", "red"),
+       pch = c(1,1,NA),
+       lty = c(NA,NA,2))
+```
+
+Notice the mean in all of the surveys is substantially below the true mean. This type of bias is common in census surveys where some populations are over represented and others are underrepresented.
+
+## Bias in Imputation
+
+Suppose 25% of the house prices are missing from the data. What would be the proper course of action. Would you fill in the data with certain values, would you delete the rows where the price was missing? There is a process called imputation where a data scientist fills in missing values using different methods. We will discuss the effects of three different types of imputation, Mean Imputation, Median Imputation and Context-Aware Imputation  
+
+1. Mean Imputation
+
+Mean Imputation - This imputes missing values with the mean value. This method works well when the data follows normal distribution where the data is centered around the mean. 
+
+2. Median Imputation
+
+Median Imputation - This imputes missing values with the median value. This method is more reliable than the mean imputation especially if the data is not normally distributed.
+
+3. Category Imputation
+
+Category Imputation - This imputes the missing values by using the mean or median of a certain category. For example, all of the missing values of the house will be imputed by the category mean of the value based on the type of house, or the area that the house is in. 
+
+- Compare Imputations vs. True Value
+
+Let's compare mean and median imputation assuming we have a survey of 800 houses and 25% of the data is missing. We will randomly impute the data sets and compare the mean price of the houses by the population mean. Let's run this simulation 1000 times.
+```{r}
+# ---------- Values and Empty Vectors ----------
+iterations <- 1000 # Iterations of Sampling
+survey <- 800 # Number of Houses Randomly Sampled
+missing_values <- 0.25 # Percentage of Missing Values
+mean_imp_vec <- c() # Mean Imputed Empty Vector
+median_imp_vec <- c() # Median Imputed Empty Vector
+true_mean <- mean(prices) # Population Mean
+true_median <- median(prices) # Population Median
+
+# ---------- Survey Iterations ----------
+for(i in 1:iterations){
+  # ---------- Run Surveys ----------
+  survey_sample <- sample(prices, survey, replace = FALSE) # Sample the     Values
+  mv_indexes <- round(runif(survey * missing_values,1,800),0) # Missing     Value Indexes
+  survey_sampleMean <- replace(survey_sample, mv_indexes, true_mean) #      Mean Imputation
+  survey_sampleMedian <- replace(survey_sample, mv_indexes, true_median) #   Median Imputation
+  
+  # ---------- Results ----------
+  mean <- mean(survey_sampleMean) # Mean of Survey
+  median <- mean(survey_sampleMedian) # Median of Survey
+  
+  
+  # ---------- Append Vectors ----------
+  mean_imp_vec <- append(mean_imp_vec, mean) # Append Mean Imputation
+  median_imp_vec <- append(median_imp_vec, median) # Append Median          Imputaiton
+}
+
+# ---------- Plot Results ----------
+plot(mean_imp_vec,
+     ylim = c(1000000, 2000000),
+     xlab = "Sample Index",
+     ylab = "Price",
+     main = "Mean and Median Imputation Comparison") # Plot Mean
+points(median_imp_vec, col = "blue")
+abline(h = true_mean, lty = 2, col = "red") # True Mean Line
+legend("bottomright", legend = c("Mean Imputation", "Median Imputation", "True Mean"), col = c("black", "blue", "red"), pch = c(1,1,NA), lty = c(NA,NA,2))
+```
+
+We see that the mean imputation is a better method. The median imputation seems to underestimate the true mean consistently.Each time this code is run, the prices are sampled randomly. Play around with the random sampling iterations or make the iteration 1 to see if the median imputation is ever stronger than the mean imputation.
+
+# Conclusion
+
+Biased sampling can significantly distort statistical inferences, leading to misleading conclusions about a population. Through our analysis of London housing prices, we demonstrated how different types of bias—such as disproportionate sampling and self-selection—can create inaccurate estimates of key statistics like the mean and median. The law of large numbers assures us that with sufficiently large, unbiased samples, we can approximate true population parameters. However, when bias is present, even large samples can lead to incorrect conclusions.
+
+To mitigate these risks, researchers must carefully design their sampling methods. Ensuring proportional representation, accounting for potential self-selection effects, and using appropriate imputation techniques for missing data all play critical roles in reducing bias. While perfect sampling is often impractical, recognizing and addressing sources of bias allows for more reliable data-driven decision-making.
+
+By understanding the dangers of biased sampling, analysts and decision-makers can improve the quality of their insights and avoid costly mistakes in fields ranging from real estate valuation to medical research and financial forecasting.
+
+The RMarkdown file for this article is on my GitHub page.
+
+
+# References:
+https://www.scribbr.com/methodology/sampling-methods/
+
+Housing Prices in London Dataset: https://www.kaggle.com/datasets/arnavkulkarni/housing-prices-in-london
