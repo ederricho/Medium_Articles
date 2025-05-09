@@ -1,0 +1,131 @@
+---
+title: '[Scratchwork] Random Sampling Article'
+author: "Edgar Derricho"
+date: "2025-05-07"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+To test the simulations, change these values and run all.
+
+```{r}
+efficacy <- 0.25 # Efficacy of the Treatment
+populationSize <- 300 # Population Size  
+n <- 1000 # Number of Simulations
+sampleSize <- 30 # Sample Size to Compare Means
+```
+
+
+
+- How accurate are the means random samples of 30 from a control population compared to the treatment population with known significance in treatment?
+- How accurate are the comparison of two samples when n = 30.
+
+How do I tell a story with this data?
+
+
+Problem: Suppose there is a new drug that claims to lower the ### of patients with high ##. The process in procuring data is expensive and we can only take 30 samples of people before and after the treatment. Suppose this drug is known to work 25% of the time. Let's observe the population.
+
+# Code/Simulation
+
+Create Populations from Normal Distribution and Observe the Empirical Efficacy
+```{r}
+populationControl <- rnorm(populationSize, mean = 150)
+
+# -- Efficacy Calculations --
+treatmentNumbers <- seq(1, 2, 0.2)
+treatmentZeros <- rep(0,(length(treatmentNumbers) / efficacy) - length(treatmentNumbers) )
+
+# ----- Adjust Treatment -----
+populationTreatment <- populationControl + sample(c(treatmentNumbers, treatmentZeros,-1), populationSize, replace = TRUE)
+difference <- populationTreatment - populationControl
+
+# ----- Create Data Frame -----
+# -- Color --
+color <- ifelse(difference > 0, "red", "black")
+
+# -- Data Frame --
+treatmentDf <- data.frame(populationControl, populationTreatment, difference, color)
+t.test(populationControl, populationTreatment)
+cat("Empirical Efficacy: ", sum(difference > 0)/populationSize)
+View(treatmentDf)
+
+
+```
+
+Population Histograms and Treatment Scatterplot
+```{r}
+library(ggplot2)
+hist(c(populationControl, populationTreatment), col = "lightblue", main = "Full Dataset Histogram", xlab = "Index", ylab = "Number")
+
+#library(ggplot2)
+
+# Scatterplot of control vs treatment, colored by 'color' column
+library(ggplot2)
+
+# Add a grouping variable for legend
+treatmentDf$group <- factor(
+  ifelse(treatmentDf$color == "red", "Improved", "No Improvement"),
+  levels = c("Improved", "No Improvement")
+)
+
+# Create the scatterplot
+ggplot(treatmentDf, aes(x = c(1:populationSize), y = populationTreatment, color = group)) +
+  geom_point(alpha = 0.7) +
+  scale_color_manual(values = c("Improved" = "red", "No Improvement" = "black")) +
+  geom_abline(slope = 1, intercept = 0, linetype = "dotted", color = "gray") +  # Optional reference line
+  labs(title = "Treatment vs. Control Outcomes",
+       x = "Control Value",
+       y = "Treatment Value",
+       color = "Treatment Effect") +
+  theme_minimal()
+
+
+```
+
+There is a clear difference in means for the populations meaning the treatment was effective. Suppose we only were able to procure 30 samples from the population. suppose, we simulate this sample procurement 100 times. We will observe the mean differences of the sample and the confidence interval. We will also observe a t-test. These tests should show that there is a significant difference in the means of the samples ie. the difference is not 0. 
+
+Let's observe the accuracy within the confidence interval.
+```{r}
+# ----- Do Simulations -----
+score <- 1.96
+meanDifference <- mean(treatmentDf$difference) # Population Mean
+sampleDifferences <- numeric(n) # Empty Vector of Sample Differences
+samplePValues <- numeric(n) # Empty Vector of Sample P-Values for Wilcoxon Tests
+
+for(i in 1:n){
+  sample <- sample(treatmentDf$difference, size = sampleSize, replace = FALSE)
+  test <- t.test(sample, mu = 0)
+  samplePValues[i] <- test$p.value
+  sampleDifferences[i] <- mean(sample)
+}
+
+# ----- Plot Means of Sample Differences -----
+# -- Confidence Interval --
+ciUpper <- mean(sampleDifferences) + score * sd(sampleDifferences)
+ciLower <- mean(sampleDifferences) - score * sd(sampleDifferences)
+
+# -- Plots --
+plot(sampleDifferences)
+abline(h = mean(sampleDifferences)) # Mean of Sample Differences Means
+abline(h = ciUpper, lty = 2, col = "red") # CI Upper
+abline(h = ciLower, lty = 2, col = "red" ) # CI Lower
+
+# ----- Plot Sample p-values -----
+plot(samplePValues)
+abline(h = 0.05)
+
+# ----- Results -----
+cat("Percentage of Sample Differences Greater than Mean: ",sum(sampleDifferences >= meanDifference)/n, "\n")
+cat("Percentage of Values in Confidence Interval: ", sum(sampleDifferences >= ciLower & sampleDifferences <= ciUpper)/n, "\n")
+cat("Sample P-Values that reject null hypothesis: ",sum(samplePValues <= 0.05)/n)
+
+
+# ----- DataFrame -----
+simulationData <- data.frame(sampleDifferences, samplePValues, ciUpper, ciLower)
+
+```
+
+We see that almost every mean sample difference is within the confidence interval of the population mean. This shows that at sample size 30, we will achieve the population result of the difference of means.
