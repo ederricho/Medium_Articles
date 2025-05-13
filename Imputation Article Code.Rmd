@@ -1,0 +1,117 @@
+---
+title: "Imputation Function"
+author: "Edgar Derricho"
+date: "2025-05-12"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Percentage Function for Monitoring Monte Carlo Simulations
+
+```{r}
+percentage <- function(x, iterations = 10000){
+  if(x == iterations){
+    print("Complete")
+  }else if(x == iterations/4){
+    print("25%")
+  }else if(x == iterations/2){
+    print("50%")
+  }else if(x == iterations * 0.75){
+    print("75%")
+  }
+}
+```
+
+
+Imputation
+
+Here, we are testing accuracy to the known population mean vs. the amount of missing data.
+
+```{r}
+# -- Population --
+populationSize <- 1000
+missingData <- seq(0.05, 0.30, 0.01)
+dataSet <- rnorm(populationSize)
+meanDataSet <- mean(dataSet)
+#ciUpper <- meanDataSet + 1.96 * sd(dataSet)
+#ciLower <- meanDataSet - 1.96 * sd(dataSet)
+means <- numeric(length(missingData))
+boxplots <- c()
+
+for(i in 1:length(missingData)){
+  #print(i)
+  # -- Make Missing Data --
+  indicies <- sample(c(1:populationSize), size = floor(populationSize * missingData[i])) # Indicies to Make NA
+  dataSet[indicies] <- NA
+  
+  # -- Impute Data with Means --
+  dataSet[indicies] <- mean(dataSet, na.rm = TRUE)
+  
+  # -- calculate and Append Mean --
+  means[i] <- mean(dataSet)
+  #print(mean(dataSet))
+  
+  boxplot(dataSet, main = paste("Boxplot of New Dataset at Missing Data: ", missingData[i])) # Boxplot of 
+}
+
+plot(x = missingData, y = means)
+abline(h = meanDataSet, lty = 2, col = "red")
+#abline(h = ciUpper, lty = 2, col = "red")
+#abline(h = ciLower, lty = 2, col = "red")
+```
+
+Intuitively, we see a trend that as the amount of missing data grows, the further the imputed mean is from the population mean. 
+
+Let's run this simulation 10000 times. Let's observe the mse of the imputed means and the population mean.
+
+$$\frac{1}{n}\sum_{i=1}^{n}(\mu_{population}-\mu_{imputed})^2$$
+We want to know the distribution of the mse for the simulations. Why is this important? If the distribution is normal, we know that there is little bias in our imputation method. If the distirbution is skewed, we know this method has the possibility to produce bias in the mean estimate.
+
+```{r}
+iterations <- 10000
+mseVector <- numeric(iterations)
+varianceVector <- numeric(iterations)
+
+for(i in 1:iterations){
+  # -- Population --
+  populationSize <- 1000
+  missingData <- seq(0.05, 0.25, 0.01)
+  dataSet <- rnorm(populationSize)
+  meanDataSet <- mean(dataSet)
+  #ciUpper <- meanDataSet + 1.96 * sd(dataSet)
+  #ciLower <- meanDataSet - 1.96 * sd(dataSet)
+  means <- numeric(length(missingData))
+
+  for(j in 1:length(missingData)){
+    #print(j)
+    # -- Make Missing Data --
+    indicies <- sample(c(1:populationSize), size = floor(populationSize * missingData[j])) # Indicies to Make NA
+    dataSet[indicies] <- NA
+  
+    # -- Impute Data with Means --
+    dataSet[indicies] <- mean(dataSet, na.rm = TRUE)
+  
+    # -- calculate and Append Mean and Variance --
+    means[j] <- mean(dataSet)
+    #print(mean(dataSet))
+  }
+  mseVector[i] <- mean((means - meanDataSet)^2)
+  varianceVector[i] <- sd(means) ^ 2
+  
+  percentage(i, iterations = iterations)
+}
+```
+
+
+```{r}
+plot(mseVector)
+plot(varianceVector)
+hist(mseVector)
+```
+
+The tests show that the deviation from the population mean grows as the amount of imputed data increases. This difference is small relative to the standard deviation (which is 1 in our example). This data has two properties that are in our favor. This data is normally distributed (meaning the expected value is the mean), also our population size is 1000.
+
+This can be more challenging when dealing with non-normal samples where the sample size is small.
