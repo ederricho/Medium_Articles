@@ -1,0 +1,84 @@
+---
+title: "Stock Algo Article"
+author: "Edgar Derricho"
+date: "2025-06-07"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Important Functions
+
+Download and run the functions from the file here:
+
+Afterward, run all.
+
+# Gathering Data and Analysis
+
+Retrieving Stock Data
+```{r}
+library(tidyquant)
+ticker <- "SPY"
+stockData <- tq_get(ticker, from = "2020-01-01", to = "2025-03-01")
+price <- stockData$close
+windows <- seq(3, 15, 1)
+mseVectorLR <- c()
+
+```
+
+Rolling Linear Regression
+```{r}
+for(i in windows){
+  df <- rollingLinear(price, window = i)
+  df$prediction <- df$betaCoeff * df$index + df$intercepts
+  df$nextDay <- c(df$prices[2:length(df$prices)], NA)
+  df$Error <- df$nextDay - df$prediction
+  mseVectorLR <- append(mseVectorLR, mean(df$Error^2, na.rm = TRUE))
+}
+
+```
+
+Results: Rolling Linear Regression
+
+Graph 1: MSE by Window Size (Linear Regression)
+```{r}
+plot(windows, mseVectorLR, type = "b", col = "steelblue", lwd = 2,
+     xlab = "Window Size", ylab = "Mean Squared Error (MSE)",
+     main = "MSE of Rolling Linear Regression")
+abline(h = 0, col = "red", lty = 2)
+```
+
+Graph 2: Error Distribution for Best Linear Model
+```{r}
+hist(df$Error, col = "lightcoral", breaks = 50,
+     main = "Distribution of Prediction Errors (Best Window)",
+     xlab = "Prediction Error", border = "white")
+```
+
+
+Computing SSA MSE
+```{r}
+mseVectorSSA <- c()
+for(i in windows){
+  ssaData <- simple.algo(stockData$close,
+                         window = i,
+                         min = 1,
+                         max = length(stockData$close))
+  mseVectorSSA <- append(mseVectorSSA, mean(ssaData$`Optimized Error`^2))
+}
+
+```
+
+Graph 3: Comparing Prediction Error (LR vs SSA)
+```{r}
+plot(windows, mseVectorLR, type = "b", col = "darkred", lwd = 2,
+     xlab = "Window Size", ylab = "Mean Squared Error (MSE)", ylim = c(0,400),
+     main = "MSE Comparison: Linear Regression vs SSA")
+lines(windows, mseVectorSSA, type = "b", col = "darkgreen", lwd = 2)
+legend("topleft", legend = c("Linear Regression", "SSA"),
+       col = c("darkred", "darkgreen"), lty = 1, lwd = 2)
+
+```
+
