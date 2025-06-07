@@ -11,7 +11,7 @@ knitr::opts_chunk$set(echo = TRUE)
 
 # Important Functions
 
-Download and run the functions from the file here:
+Download and run the functions from the file here: https://github.com/ederricho/Medium_Articles/blob/main/SimpleYetPowerful/SSA_and_Rolling_Linear_Regression.R
 
 Afterward, run all.
 
