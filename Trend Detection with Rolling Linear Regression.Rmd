@@ -1,0 +1,190 @@
+---
+title: "Rolling Linear Regression for Trend Detection"
+author: "Edgar Derricho"
+date: "2025-06-07"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+Important Functions:
+```{r}
+# Rolling Linear
+
+rollingLinear <- function(vector, window = 3, res = TRUE, cDist = betaCoeffDist, sdDist = residualStDev, volTime = 1){
+  # -- Empty Vectors --
+  prices <- c()
+  betaCoeff <- c()
+  intercepts <- c()
+  standardDeviations <- c()
+  coeffPercentile <- c()
+  sdPercentile <- c()
+  volatility <- c()
+  
+  # -- Rolling LR Model --
+  for(i in 1:(length(vector)-window)){
+    left <- i
+    right <- i + window
+    model <- lm(vector[left:right] ~ c(left:right))
+    if(res == TRUE){
+      stDev <- sd(model$residuals)
+    }else if(res == FALSE){
+      stDev <- NA
+    }
+    
+    #print(model$coefficients[2])
+    # -- Percentiles --
+    percBeta <- sum(model$coefficients[2] >= cDist ) / length(cDist)
+    percRes <- sum(stDev >= sdDist) / length(sdDist)
+    
+    # -- Coefficients and Standard Deviations 
+    prices <- append(prices, vector[i+window])
+    betaCoeff <- append(betaCoeff, model$coefficients[2])
+    intercepts <- append(intercepts, model$coefficients[1])
+    standardDeviations <- append(standardDeviations,stDev)
+    coeffPercentile <- append(coeffPercentile, percBeta)
+    sdPercentile <- append(sdPercentile, percRes)
+    volatility <- append(volatility, sd(vector[i:(i+window)]) * sqrt(volTime))
+    
+  }
+  # -- Dataframe of Information --
+  df <- data.frame(prices,
+                   betaCoeff,
+                   intercepts, 
+                   standardDeviations,
+                   coeffPercentile,
+                   sdPercentile,
+                   volatility)
+  
+  df$index <- c(1:length(df$prices))
+  
+  return(df)
+}
+
+head(rollingLinear(rnorm(500)))
+
+# -----------------------------------------------------
+# -----------------------------------------------------
+# -----------------------------------------------------
+
+# Binary Percent
+
+binPerc <- function(vector){
+  vector <- na.omit(vector)
+  perc <- sum(vector)/length(vector)
+  return(perc)
+}
+
+binPerc(rbinom(500, 1,0.25))
+```
+
+
+# Introduction
+
+We have assessed the prediction power of linear regression in stock price prediction and found much to be desired. Let us know observe the prediction power of linear regression for trend detection. Our research question is as follows: What is the likelihood that linear regression will predict the movement of the next price in the stock data?
+
+Here are the criteria for our test:
+
+1: If the slope of the beta coefficient in the linear regression formula matches the movement of the next price from the previous price
+
+0: If the slope of the beta coefficient in the linear regression formula does not match the movement of the next price from the previous price
+
+# Results:
+
+We will first evaluate the trend detection for a three-day rolling window:
+```{r}
+# Prices
+prices <- Apple_5yr$Close
+
+# Rolling Linear Regression Data Frame
+df <- rollingLinear(prices, window = 3)
+df$nextDay <- c(df$prices[2:length(df$prices)], NA)
+df$Diff <- df$nextDay - df$prices
+df$trend <- ifelse(df$betaCoeff > 0 & df$Diff > 0 | df$betaCoeff < 0 & df$Diff < 0, 1, 0)
+```
+
+
+```{r}
+# Percentage
+cat("Percent Accuracy of Three-Day Linear Regression: ", binPerc(df$trend)) # Creates a Percentage from the list of 0's and 1's
+```
+
+We see the trend detection is correct 49% of the time.
+
+Let's observe this as the window increases:
+```{r}
+window <- seq(3, 25, 1)
+percents <- c()
+
+for(i in window){
+  df <- rollingLinear(prices, window = i)
+  df$nextDay <- c(df$prices[2:length(df$prices)], NA)
+  df$Diff <- df$nextDay - df$prices
+  df$trend <- ifelse(df$betaCoeff > 0 & df$Diff > 0 | df$betaCoeff < 0 & df$Diff < 0, 1, 0)
+
+  # Percentage
+  percents <- append(percents, binPerc(df$trend)) # Creates a Percentage from the list of 0's and 1's
+}
+
+percents
+plot(percents, main = "One-Day Accuracy of Rolling Linear Regression", xlab = "Window", ylab = "Accuracy (%)")
+```
+
+We see as the window size increases, the accuracy of detecting trends stay consistent (within 4%).
+
+Let's modify this a bit. Suppose we want to see if the trend is correct n days after the measured regression. I.e. If we wanted to know of the price would be in the upward trend three days form now, would this yeild better results? We will base n days off of the window size.
+
+UPdated Question: What is the percentage that the trend of a linear regression line for n days will resemble the trend for n days after the regression?
+
+Modified Loop
+```{r, warning=FALSE}
+window <- seq(3, 25, 1)
+percents <- c()
+
+for(i in window){
+  df <- rollingLinear(prices, window = i)
+  df$futureTrend <- ifelse(df$prices[2:length(df$prices)] - df$prices > 0, 1, 0)
+  df$mainTrend <- ifelse(df$prices[2:length(df$prices)] - df$prices[1:length(df$prices)] > 0, 1,0)
+  df$nextDay <- c(df$prices[i:length(df$prices)], rep(NA, i-1))
+  df$Diff <- df$nextDay - df$prices
+  df$trend <- ifelse(df$betaCoeff > 0 & df$Diff > 0 | df$betaCoeff < 0 & df$Diff < 0, 1, 0)
+
+  # Percentage
+  percents <- append(percents, binPerc(df$trend)) # Creates a Percentage from the list of 0's and 1's
+}
+
+percents
+plot(percents, main = "Rolling Regression Trend Projection Percentages", xlab = "Window", ylab = "Accuracy (%)")
+```
+
+We see there is a difference in trend detection when the window represents a projection. We see that for the ten-day window, the probability that the slope of the linear regression line predicts the tenth day's price being larger is 59% compared the 49% for three days. We see when we use 25 days as the max, there is a quadratic nature to the percentage the moving linear regression has when detecting the nth day. We see the peak is 60% when we have a 14-day linear regression and we are projecting whether the price 14 days from the current day will represent the direction the linear regression coefficient is giving.
+
+We can optimize the rolling regression window using an algorithm.
+
+# Question: Is this better than flipping a coin?
+
+Thankfully, I was not excited about the 60% accuracy. Let's check to see if chance can beat our proposed model. We will run 1000 simulations of flipping a coin and observe the mean accuracy of flipping the coin to decide if the trend is correct:
+
+```{r}
+iterations <- 1000
+coinPercent <- numeric(iterations)
+trueTrend <- df$mainTrend # True One-Day Trend for Stock Price
+
+for(i in 1:iterations){
+  coin <- rbinom(length(df$prices), 1, 0.5)
+  results <- ifelse(coin == trueTrend, 1, 0)
+  coinPercent[i] <- binPerc(results)
+}
+
+plot(coinPercent)
+hist(coinPercent, col = "lightblue", main = "Distribution of Coin Flip Accuracy", xlab = "Percent Accuracy")
+cat("Mean Coin Flip Accuracy: ", mean(coinPercent))
+```
+
+We see that the mean percentage of the coin flip accuracy is 49.9999%. This beats the three-day moving linear regression accuracy prediction, but it does not beat any other prediction method. 
+
+
+# Conclusion:
+
