@@ -1,0 +1,327 @@
+---
+title: "Distribution of the Predictor"
+author: "Edgar Derricho"
+date: "2025-07-09"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction
+
+As a student of the subject of statistics, I find myself musing over things that just might not matter. I find myself asking questions like: Can I model the movement of a stock using noisy switches? Can I use binomial distribution to figure out if the old saying "every no leads to a yes" has merit? Can I use a Monte Carlo Simulation to solve any problem I have in life? These questions come like pesky thoughts that just wont wiggle out of your mind. Well, sometimes I think of a question that I must find the answer for. This question is: Does the distribution of the predictor matter in linear regression? In this article, we will discuss whether or not the distribution of the predictor in linear regression makes a difference in the linear model.
+
+# Methodology
+
+At its core, linear regression aims to find patterns in data. These patterns can then be modeled using a line. This line can then be used to interpolate values within the domain (x-values) or predict values outside of the domain. The probability distribution of a variable gives us clues about the behavior of a variable and lets us know crucial information like the center (mean, median), the spread (variance, standard deviation) and the density (frequency are data values). In this article, we will examine linear regression where the predictors are from three different continuous probability distributions: Normal, Uniform and Exponential.
+
+Let's Quickly Observe the Behavior of these distributions. We will observe these through histograms and scatterplots.
+
+Normal
+```{r}
+library(ggplot2) # ggplot2 Library for Plotting
+library(patchwork) # Place Plots Together
+
+# Parameters and Data Frame
+n <- 300
+df <- data.frame(rnorm(n), runif(n), rexp(n))
+colnames(df) <- c("Normal", "Uniform", "Exponential")
+#head(df) # Observe the Dataframe
+
+# -- Generate Plots --
+
+# Normal Scatterplot
+x <- c(1:n)
+n1 <- ggplot(df, aes(x = x, y = Normal)) +
+  geom_point(color = "lightblue", size = 2) +
+  labs(title = "Scatterplot of Normally Distributed Variable", x = "X", y = "Y") +
+  theme_minimal()
+
+# Normal Histogram
+n2 <- ggplot(df, aes(x = Normal)) +
+    geom_histogram(fill = "lightblue", color = "black", bins = 30) +
+    labs(title = "Histogram of Normally Distributed Variable", x = "Value", y = "Frequency") +
+    theme_minimal()
+
+print(n1/n2)
+```
+
+Uniform
+```{r}
+# Uniform Scatterplot
+x <- c(1:n)
+u1 <- ggplot(df, aes(x = x, y = Uniform)) +
+  geom_point(color = "lightblue", size = 2) +
+  labs(title = "Scatterplot of Uniformly Distributed Variable", x = "X", y = "Y") +
+  theme_minimal()
+
+# Uniform Histogram
+u2 <- ggplot(df, aes(x = Uniform)) +
+    geom_histogram(fill = "lightblue", color = "black", bins = 30) +
+    labs(title = "Histogram of Uniformly Distributed Variable", x = "Value", y = "Frequency") +
+    theme_minimal()
+
+print(u1/u2)
+```
+
+Exponential
+```{r}
+# Exponentially Scatterplot
+x <- c(1:n)
+e1 <- ggplot(df, aes(x = x, y = Exponential)) +
+  geom_point(color = "lightblue", size = 2) +
+  labs(title = "Scatterplot of Exponentially Distributed Variable", x = "X", y = "Y") +
+  theme_minimal()
+
+# Normal Histogram
+e2 <- ggplot(df, aes(x = Exponential)) +
+    geom_histogram(fill = "lightblue", color = "black", bins = 30) +
+    labs(title = "Histogram of Exponentially Distributed Variable", x = "Value", y = "Frequency") +
+    theme_minimal()
+
+print(e1/e2)
+```
+
+Now that we can visualize the differences, let us discuss the way we will evaluate the linear regression.
+
+We will use a one feature linear regression equation: $\hat{y}=\beta_0+\beta_1x+\epsilon,\epsilon \sim N(0,\sigma^2)$
+
+We will observe:
+
+- $R^2$ Goodness of Fit
+- Absolute Bias of $\hat{\beta}_1:|E[\beta_1]-\beta|$
+- Leverage using Cook's Distance
+
+We will also compare the distributions of $R^2$ and $\beta_1$ using Monte Carlo simulations.
+
+# Implimentaion and Results
+
+We will create synthetic data using random values from the desired distribution inputted into the following equation:
+
+$$y = m\vec{x}+b+\epsilon, \epsilon ~ N(0,1)$$
+
+```{r}
+# Create Synthetic Data
+n <- 300 # Number of Variables
+m <- 3 # Slope
+b <- 5 # Intercept
+epsilon <- rnorm(n) # Gaussian Noise
+
+# X-Values
+xNorm <- rnorm(n)
+xUnif <- runif(n)
+xExp <- rexp(n)
+
+# Y-Values
+yNorm <- m * xNorm + b + epsilon
+yUnif <- m * xUnif + b + epsilon
+yExp <- m * xExp + b + epsilon
+
+# Input into Dataframe
+df <- data.frame(xNorm, xUnif, xExp, yNorm, yUnif, yExp)
+
+# -- Plot the Scatterplots --
+x <- c(1:n)
+
+# Normal
+ggplot(df, aes(x = xNorm, y = yNorm)) +
+  geom_point(color = "black", size = 2) +
+  labs(title = "Scatterplot of Normally Distributed Predictor", x = "X", y = "Y") +
+  theme_minimal()
+
+# Uniform
+ggplot(df, aes(x = xUnif, y = yUnif)) +
+  geom_point(color = "black", size = 2) +
+  labs(title = "Scatterplot of Uniformly Distributed Predictor", x = "X", y = "Y") +
+  theme_minimal()
+
+# Exponential
+ggplot(df, aes(x = xExp, y = yExp)) +
+  geom_point(color = "black", size = 2) +
+  labs(title = "Scatterplot of Exponentially Distributed Predictor", x = "X", y = "Y") +
+  theme_minimal()
+```
+
+Let's Create the Models
+```{r}
+# Normal
+nModel <- summary(lm(yNorm ~ xNorm, data = df))
+
+# Uniform
+uModel <- summary(lm(yUnif ~ xUnif, data = df))
+
+# Exponential
+eModel <- summary(lm(yExp ~ xExp, data = df))
+```
+
+Let's Observe the $R^2$, Absolute Bias of Beta, Residual Standard Error
+```{r}
+# Rows
+col1 <- c(nModel$r.squared, uModel$r.squared, eModel$r.squared)
+col2 <- c(nModel$coefficients[2] - m, uModel$coefficients[2] - m, eModel$coefficients[2] - m)
+col3 <- c(0.9876, 0.9884, 0.9887)
+
+results <- data.frame(col1, col2, col3) # Results Dataframe
+
+# Rename Rows and Columns
+rownames(results) <- c("Normal", "Uniform", "Exponential")
+colnames(results) <- c("R-Squared", "Beta Bias", "RSE")
+
+results
+```
+
+The normal and uniform variables have similar absolute beta bias (-0.099673999 and 0.089465833 respectively). The model for the normally distributed predictor underestimates beta and the uniform model overestimates beta. The exponential overestimates, but the estimate (0.005508489) is much closer to the true value of beta. 
+
+Let's find the Distribution of $R^2$ and the bias in Beta using Monte Carlo. We will randomly generate 1000 models to get the distribution of $R^2$ and Bias in Beta for each distribution
+```{r}
+# -- Simulation Setup --
+iterations <- 1000
+n <- 300
+
+# -- Empty Vectors --
+normalRSQ <- numeric(n)
+normalBeta <- numeric(n)
+uniformRSQ <- numeric(n)
+uniformBeta <- numeric(n)
+expRSQ <- numeric(n)
+expBeta <- numeric(n)
+
+# MC Simulation
+for(i in 1:iterations){
+  # -- X, Y, m, b Values --
+  
+  m <- runif(1, 0, 10)
+  b <- runif(1, 0, 10)
+  
+  # X-Values
+  xNorm <- rnorm(n)
+  xUnif <- runif(n)
+  xExp <- rexp(n)
+
+  # Y-Values
+  yNorm <- m * xNorm + b + epsilon
+  yUnif <- m * xUnif + b + epsilon
+  yExp <- m * xExp + b + epsilon
+  
+  df <- data.frame(xNorm, xUnif, xExp, yNorm, yUnif, yExp)
+  
+  # -- Models --
+  
+  # Normal
+  nModel <- lm(yNorm ~ xNorm, data = df)
+  nModelSummary <- summary(nModel)
+  
+  # Uniform
+  uModel <- lm(yUnif ~ xUnif, data = df)
+  uModelSummary <- summary(uModel)
+
+  # Exponential
+  eModel <- lm(yExp ~ xExp, data = df)
+  eModelSummary <- summary(eModel)
+  
+  # Append Vectors
+  normalRSQ[i] <- nModelSummary$r.squared
+  normalBeta[i] <- nModelSummary$coefficients[2] - m
+  uniformRSQ[i] <- uModelSummary$r.squared
+  uniformBeta[i] <- uModelSummary$coefficients[2] - m
+  expRSQ[i] <- eModelSummary$r.squared
+  expBeta[i] <- eModelSummary$coefficients[2] - m
+  
+  
+}
+```
+
+Plots
+```{r}
+# -- R-Squared Histograms --
+
+df <- data.frame(normalRSQ,
+                 normalBeta,
+                 uniformRSQ,
+                 uniformBeta,
+                 expRSQ,
+                 expBeta)
+
+# Normal Histogram
+rn <- ggplot(df, aes(x = normalRSQ)) +
+    geom_histogram(fill = "lightblue", color = "black", bins = 30) +
+    labs(title = "Histogram of Normally Distributed R-Squared", x = "Value", y = "Frequency") +
+    theme_minimal()
+
+ru <- ggplot(df, aes(x = uniformRSQ)) +
+    geom_histogram(fill = "lightblue", color = "black", bins = 30) +
+    labs(title = "Histogram of Uniformly Distributed R-Squared", x = "Value", y = "Frequency") +
+    theme_minimal()
+
+re <- ggplot(df, aes(x = expRSQ)) +
+    geom_histogram(fill = "lightblue", color = "black", bins = 30) +
+    labs(title = "Histogram of Exponentially Distributed R-Squared", x = "Value", y = "Frequency") +
+    theme_minimal()
+
+print(rn/ru/re)
+
+# -- Beta Histograms --
+
+# Normal Histogram
+bn <- ggplot(df, aes(x = normalBeta)) +
+    geom_histogram(fill = "lightblue", color = "black", bins = 30) +
+    labs(title = "Histogram of Normally Distributed Beta", x = "Value", y = "Frequency") +
+    theme_minimal()
+
+bu <- ggplot(df, aes(x = uniformBeta)) +
+    geom_histogram(fill = "lightblue", color = "black", bins = 30) +
+    labs(title = "Histogram of Uniformly Distributed Beta", x = "Value", y = "Frequency") +
+    theme_minimal()
+
+be <- ggplot(df, aes(x = expBeta)) +
+    geom_histogram(fill = "lightblue", color = "black", bins = 30) +
+    labs(title = "Histogram of Exponentially Distributed Beta", x = "Value", y = "Frequency") +
+    theme_minimal()
+
+print(bn/bu/be)
+```
+
+
+Explanation R Squared
+ 
+We see $R^2$ goodness of fit performs mostly close to 1.0 for both the normal and exponential distributred predictor. We see a large difference and spread of the $R^2$ for the uniform distirbuted predictor. This makes sense since as the data are more spread in the uniform variable and thus more subect to uncertainty. 
+ 
+
+Explanation Beta
+
+We see both the normal and expoenetially distributed predictor have similar distributions of beta, both are within the range of roughly [-0.1,0.1]. This is a stark contrast to the uniform predictor whose beta distribution has a range of [-0.5,0.5] which shows more uncertainty in the estimator. Why?
+
+Let's Observe The Leverage Points Using Cook's Distance
+```{r}
+# Data Frame of Cooks Distance
+df <- data.frame(cooks.distance(nModel),
+                 cooks.distance(uModel),
+                 cooks.distance(eModel))
+colnames(df) <- c("CDN", "CDU", "CDE")
+
+# Plots
+x <- c(1:n)
+
+# Normal
+ggplot(df, aes(x = x, y = CDN)) +
+  geom_point(color = "black", size = 2) +
+  labs(title = "Cook's Distance Normal", x = "X", y = "Y") +
+  theme_minimal()
+
+# Uniform
+ggplot(df, aes(x = x, y = CDU)) +
+  geom_point(color = "black", size = 2) +
+  labs(title = "Cook's Distance Uniform", x = "X", y = "Y") +
+  theme_minimal()
+
+# Exponential
+ggplot(df, aes(x = x, y = CDE)) +
+  geom_point(color = "black", size = 2) +
+  labs(title = "Cook's Distance Exponential", x = "X", y = "Y") +
+  theme_minimal()
+```
+
+
+
