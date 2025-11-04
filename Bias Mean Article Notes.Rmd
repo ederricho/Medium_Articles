@@ -1,0 +1,133 @@
+---
+title: "Bias Mean Article"
+author: "Edgar Derricho"
+date: "2025-11-04"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Introduction
+
+Biased sampling is the silent killer in many statistical endeavors. Bias an be unknown and the parameters and impact of bias can also be unknown. In this article, we will do our best to quantify bias. We will observe some what-ifs about bias and compare this to unbiased samples.
+
+# Methodology
+
+We will generate a base population and obtain 1000 random samples (of random sizes between 30 and 500) from this population We will have three groups:
+
+- Unbiased Group
+- Biased Group (with constant bias)
+- Random Bias Group (with random normally distributed bias - $N(0,\sigma_v^2)$)
+
+We will do the following tests:
+
+- ANOVA test for the difference of mean groups
+- Coverage Probability of the Confidence interval for the true mean
+- Scatterplot of Means
+- Boxplot of Means
+
+# Code and Results
+
+```{r}
+N <- 10000
+population <- rnorm(N)
+mu <- mean(population) # True Mean
+iterations <- 1000
+sampleSizes <- seq(30,500,1)
+c <- 1 # Bias Constant
+zValue <- qnorm(0.975)
+
+# Confidence Interval Function
+quickCI <- function(vector, alpha = 0.05){
+  zValue <- qnorm(1 - alpha / 2)
+  sigma <- sd(vector)
+  n <- length(vector)
+  me <- zValue * (sigma / sqrt(n))
+  xbar <- mean(vector)
+  ci <- c(xbar - me, xbar + me)
+  return(ci)
+}
+
+# Empty Vectors
+# -- Means --
+sampleMeans_noBias <- numeric(iterations)
+sampleMeans_constantBias <- numeric(iterations)
+sampleMeans_randomBias <- numeric(iterations)
+# -- Coverage Probs --
+coverageNoBias <- numeric(iterations)
+coverageConstantBias <- numeric(iterations)
+coverageRandomBias <- numeric(iterations)
+
+
+# Simulation for Mean Groups
+for(i in 1:iterations){
+  n <- sample(sampleSizes, 1)# Sample Size
+  samp <- sample(population, n)
+  c_biasSamp <- samp + c # Constant Bias
+  r_biasSamp <- samp + rnorm(n,mean = seq(-1,1,0.1), sd = seq(1,3,0.2)) # Random Bias
+  
+  # Confidence Interval
+  ci_noBias <- quickCI(samp)
+  ci_constantBias <- quickCI(c_biasSamp)
+  ci_randomBias <- quickCI(r_biasSamp)
+  
+  # ---------- Lists ----------
+  # Means
+  sampleMeans_noBias[i] <- mean(samp)
+  sampleMeans_constantBias[i] <- mean(c_biasSamp)
+  sampleMeans_randomBias[i] <- mean(r_biasSamp)
+  # Coverage Probabilities
+  coverageNoBias[i] <- ifelse(mu >= ci_noBias[1] & mu <= ci_noBias[2], 1, 0)
+  coverageConstantBias[i] <- ifelse(mu >= ci_constantBias[1] & mu <= ci_constantBias[2], 1, 0)
+  coverageRandomBias[i] <- ifelse(mu >= ci_randomBias[1] & mu <= ci_randomBias[2], 1, 0)
+}
+
+df <- data.frame(
+  sMean <- c(sampleMeans_noBias, sampleMeans_constantBias, sampleMeans_randomBias),
+  group <- c(rep("No Bias", iterations),rep("Constant Bias", iterations),rep("Random Bias", iterations))
+)
+
+# --------- Results ----------
+```
+
+
+```{r}
+# T-Tests
+# Perform t-tests for each variable
+summary(aov(sMean ~ group, data = df))
+
+t.test(sampleMeans_constantBias, sampleMeans_randomBias)
+
+# Coverage Probabilities
+cat("---- Coverage Probabiliies ----",
+  "\nNo Bias: ", mean(coverageNoBias),
+  "\nConstant Bias: ", mean(coverageConstantBias),
+  "\nRandom Bias: ", mean(coverageRandomBias),
+  "\n---- Standard Deviations -----",
+  "\nNo Bias: ", sd(coverageNoBias),
+  "\nConstant Bias: ", sd(coverageConstantBias),
+  "\nRandom Bias: ", sd(coverageRandomBias)
+)
+
+# Scatterplot of Means
+left <- 400
+right <- 500
+plot(sampleMeans_noBias[left:right], main = "Sample Means", ylim = c(mu - c, mu + (c+0.5)))
+lines(sampleMeans_constantBias[left:right], col = "blue", lty = 3)
+lines(sampleMeans_randomBias[left:right], col = "purple", lty = 4)
+abline(h = mu, col = "red", lty = 2)
+
+# Boxplot of Means
+boxplot(sMean ~ group, data = df, col = "lightblue", main = "Sample Means by Group", ylab = "Sample Means", xlab = "Group")
+abline(h = mu, col = "red", lty = 2)
+```
+
+$$\sigma^2$$
+
+An ANOVA test allows us to test the hypothesis that the sample means from each group all are the same. The ANOVA test shows us that the means are different for the groups. This is further seen through the boxplots of the sample means for each group. The constant bias' boxplot is completely away from the median. Therefore, we will never have the true population mean in any of the confidence intervals created by this sample. Notice the coverage probability of the constant bias. It is 0 showing that no confidence interval created using sample means from the group will have the true population mean. With random bias centered at 0, we see coverage that is centered at the true mean. This is promising as long as our bias is centered around zero. This is the best case scenario. The problem arises in the estemated mean. From the t-test between the no bias group and the random bias group, we see that the means are different. The mean of the random bias group is closer to 1 than 0, where the true mean lies. Observing the plots, we see the random bias group has a much larger variance than the no bias group. This variation pinpoints the issue with biased samples. Even though these graphs (scatterplot and boxplots) show that the center of the no bias and the random bias groups are similar, upon further investigation, we see that the means are fundamentally different.   
+
+# Conclusion
+
+Sampling bias is a crucial part in understanding the uncertainty of a statistic. Through this simulation, we see the detrimental effect bias has on sampling estimates and how it can cause uncertainty to skyrocket.
