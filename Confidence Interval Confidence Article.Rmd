@@ -9,15 +9,6 @@ output: html_document
 knitr::opts_chunk$set(echo = TRUE)
 options(scipen = 999) # Disable Scientific Notation
 ```
-
-# Introduction
-
-The confidence interval. Statistic's answer to uncertainty. When we make a confidence interval we are saying:
-
-We are x% confident that the true parameter of a statistic lies in this interval.
-
-A bold claim, one that needs to be substantiated in the real world, on in my case in the world of Kaggle Datasets.
-
 Let's get started with the methodology of our tests:
 
 # Methodology
@@ -32,7 +23,7 @@ We will sample 30 representatives from the population and take the confidence in
 
 Note: The quantile method is a nonparametric way of getting a confidence interval. Nonparametric means we do not make any distribution assumptions.
 
-We will also use the normality assumption confidence interval with $\alpha = 0.05$. None of the distributions of the varibales are normal, but many times we assume the distribution is normal without even knowing we are making that assumption by using the 'wrong' confidence interval method. We will not use the median of the sample either, since these methods call for the mean.
+We will also use the normality assumption confidence interval with $\alpha = 0.05$. None of the distributions of the variables are normal, but many times we assume the distribution is normal without even knowing we are making that assumption by using the 'wrong' confidence interval method. We will not use the median of the sample either, since these methods call for the mean.
 
 # Code and Results
 
@@ -190,3 +181,4 @@ abline(v = trueProportion, lty = 2, col = "red")
 plot(probs, main = "Sample Proportions", ylab = "Proportions")
 abline(h = trueProportion, lty = 2, col = "red")
 ```
+
