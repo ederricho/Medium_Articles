@@ -1,0 +1,192 @@
+---
+title: "CI Confidence"
+author: "Edgar Derricho"
+date: "2025-11-10"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+options(scipen = 999) # Disable Scientific Notation
+```
+
+# Introduction
+
+The confidence interval. Statistic's answer to uncertainty. When we make a confidence interval we are saying:
+
+We are x% confident that the true parameter of a statistic lies in this interval.
+
+A bold claim, one that needs to be substantiated in the real world, on in my case in the world of Kaggle Datasets.
+
+Let's get started with the methodology of our tests:
+
+# Methodology
+
+We are going to test the confidence interval by taking a dataset, making its statistic (mean in our case) the parameter and taking 1000 samples of this distribution and deciding if the true 'parameter' lies in the confidence interval. We will use the following datasets:
+
+1. London Housing Dataset Prices (Link to dataset)
+
+2. Uber Ride Booking Success Rate
+
+We will sample 30 representatives from the population and take the confidence interval using the quantile method: 95% CI ----> [0.025, 0.975]
+
+Note: The quantile method is a nonparametric way of getting a confidence interval. Nonparametric means we do not make any distribution assumptions.
+
+We will also use the normality assumption confidence interval with $\alpha = 0.05$. None of the distributions of the varibales are normal, but many times we assume the distribution is normal without even knowing we are making that assumption by using the 'wrong' confidence interval method. We will not use the median of the sample either, since these methods call for the mean.
+
+# Code and Results
+
+Let's start with the London Housing Dataset.
+
+Let's treat the price median as the true parameter. Population size: 3480  _Why did we choose the median? The distribution of housing prices is not normal, therefore to get a more robust estimate of the center of the data, we will use the median._
+```{r}
+# Necessary Values and Zero Vectors
+prices <- HousingLondon$Price
+iterations <- 1000
+trueMedian <- median(prices)
+trueMean <- mean(prices)
+insideCIQuant <- numeric(iterations)
+insideCINormal <- numeric(iterations)
+medians <- numeric(iterations)
+means <- numeric(iterations)
+z <- 1.96 # 95% CI
+
+
+
+# MC Simulations
+for(i in 1:iterations){
+  samp <- sample(prices, size = 30)
+  medians[i] <- median(samp)
+  means[i] <- mean(samp)
+  me <- z * (sd(samp) / sqrt(30))
+  quant <- quantile(samp, probs = c(0.025,0.975))
+  insideCINormal[i] <- ifelse(trueMedian >= means[i] - me & trueMedian <= means[i] + me, 1, 0)
+  insideCIQuant[i] <- ifelse(trueMedian >= quant[1] & trueMedian <= quant[2], 1, 0)
+}
+
+# Results
+cat(
+  "CI Accuracy Quant: ", mean(insideCIQuant),
+  "\nCI Accuracy Normal Assumption: ", mean(insideCINormal)
+)
+
+# Graphs
+plot(medians, main = "Sample Medians", xlab = "Medians")
+abline(h = trueMedian, lty = 2, col = "red")
+
+hist(medians, main = "Distribution of Medians", col = "lightblue")
+abline(v = mean(medians), lty = 2, col = "red")
+
+hist(means, main = "Sample Means", col = "lightblue", xlab = "Means")
+abline(v = trueMedian, lty = 2, col = "red")
+```
+
+
+
+Just for curiosity's sake, let's try a sample size of 5.
+
+```{r}
+trueMedian <- median(prices)
+insideCI <- numeric(iterations)
+medians <- numeric(iterations)
+
+# MC Simulations
+for(i in 1:iterations){
+  samp <- sample(prices, size = 5)
+  medians[i] <- median(samp)
+  quant <- quantile(samp, probs = c(0.025,0.975))
+  insideCI[i] <- ifelse(trueMedian >= quant[1] & trueMedian <= quant[2], 1, 0)
+}
+
+# Results
+cat(
+  "CI Accuracy: ", mean(insideCI)
+)
+
+# Graphs
+plot(medians, main = "Sample Medians")
+abline(h = trueMedian, lty = 2, col = "red")
+
+hist(medians, main = "Distribution of Medians", col = "lightblue", xlab = "Medians")
+abline(v = mean(medians), lty = 2, col = "red")
+```
+
+Let's move on to the uber dataset. We will look at the proportion of successful booking.
+
+```{r}
+# Dataset
+library(readxl)
+ncr_ride_bookings <- read_excel("C:/Users/EJ's/Downloads/archive/ncr_ride_bookings.xlsx")
+#View(ncr_ride_bookings)
+```
+
+
+```{r}
+bookings <- ncr_ride_bookings$`Booking Status`
+bookingsBinary <- ifelse(bookings == "Completed", 1, 0)
+trueProportion <- mean(bookingsBinary)
+iterations <- 1000
+probs <- numeric(iterations)
+insideCIQuant <- numeric(iterations)
+insideCINormal <- numeric(iterations)
+
+# Print True Proportion
+cat(
+  "True Proportion of Completed Bookings: ", mean(trueProportion)
+)
+
+for(i in 1:iterations){
+  samp <- sample(bookingsBinary, size = 30)
+  p <- mean(samp)
+  probs[i] <- p
+  me <- sqrt((p * (1 - p)) / n)
+  insideCINormal[i] <- ifelse(trueProportion >= p - me & trueProportion <= p + me, 1, 0)
+  insideCIQuant[i] <- ifelse(trueProportion >= quantile(samp, 0.025) & trueProportion <= quantile(samp, 0.975), 1, 0)
+}
+
+# Results
+cat(
+  "\nCoverage Probability Quantile: ", mean(insideCIQuant),
+  "\nCoverage Probability Normal Assumption: ", mean(insideCINormal)
+)
+
+# Graphs
+hist(probs, main = "Distribution of Proportions", col = "lightblue", xlab = "Proportions")
+abline(v = trueProportion, lty = 2, col = "red")
+
+plot(probs, main = "Sample Proportions", ylab = "Proportions")
+abline(h = trueProportion, lty = 2, col = "red")
+```
+
+Let's try for a sample size of 5 like before:
+```{r}
+bookings <- ncr_ride_bookings$`Booking Status`
+bookingsBinary <- ifelse(bookings == "Completed", 1, 0)
+trueProportion <- mean(bookingsBinary)
+iterations <- 1000
+probs <- numeric(iterations)
+insideCI <- numeric(iterations)
+
+# Print True Proportion
+cat(
+  "True Proportion of Completed Bookings: ", mean(trueProportion)
+)
+
+for(i in 1:iterations){
+  samp <- sample(bookingsBinary, size = 5)
+  probs[i] <- mean(samp)
+  insideCI[i] <- ifelse(trueProportion >= quantile(samp, 0.025) & trueProportion <= quantile(samp, 0.975), 1, 0)
+}
+
+# Results
+cat(
+  "\nCoverage Probability: ", mean(insideCI)
+)
+
+# Graphs
+hist(probs, main = "Distribution of Proportions", col = "lightblue", xlab = "Proportions")
+abline(v = trueProportion, lty = 2, col = "red")
+
+plot(probs, main = "Sample Proportions", ylab = "Proportions")
+abline(h = trueProportion, lty = 2, col = "red")
+```
