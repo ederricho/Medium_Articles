@@ -1,0 +1,219 @@
+---
+title: "Testing Imputation Methods - Linear Regression"
+author: "Edgar Derricho"
+date: "2025-11-10"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+What we will compare:
+
+- MSE of Imputed Values
+- Bias (mean of imputed data vs mean of true data)
+- Variance Preservation
+- Correlation Structure
+- New Regression Analysis (check bias)
+
+# Code
+
+First, let's create a correlated dataset
+```{r}
+n <- 1000 # Sample Size
+m <- 3 # Slope
+x <- rnorm(n)
+b <- rnorm(n, mean = 4, sd = 1) # Intercept
+y <- m * x + b
+
+plot(x, y)
+
+trueCorr <- cor(x, y)
+trueCorr
+
+summary(lm(y ~ x))
+```
+
+Now, let's remove 25% of the data and impute it using our methods:
+```{r}
+# Remove 25% of Data
+percRem <- 0.25 # Percent Removed
+set.seed(123) # For reproducibility
+indexes <- sample(c(1:n), size = n * percRem) # Indexes to Remove
+newY <- y
+newY[indexes] <- NA
+
+# Imputation
+meanImp <- newY
+lrImp <- newY
+
+# Mean Imputation
+meanImp[indexes] <- mean(meanImp, na.rm = T) # <--------------------------------------
+
+# Linear Regression Imputation
+modelImp <- lm(lrImp ~ x)
+lrImp[indexes] <- modelImp$coefficients[1] + modelImp$coefficients[2] * x[indexes] # <-----
+```
+
+Now that we have the values, lets compare them.
+```{r}
+comparison <- function(meanImp, lrImp, x, y, model, indexes, results = TRUE){
+  # MSE
+  meanMSE <- mean((meanImp[indexes] - y[indexes]) ^ 2)
+  lrMSE <- mean((lrImp[indexes] - y[indexes]) ^ 2)
+  
+  # Bias
+  meanBias <- mean(meanImp) - mean(y)
+  lrBias <- mean(lrImp) - mean(y)
+  
+  # Variance
+  meanVarDiff <- var(meanImp) - var(y)
+  lrVarDiff <- var(lrImp) - var(y)
+  
+  # Correlation
+  meanCorrel <- cor(x, meanImp)
+  lrCorrel <- cor(x, lrImp)
+  
+  # Regression Diagnostics
+  modelMean <- lm(meanImp ~ x) # Mean Model
+  modelLR <- lm(lrImp ~ x) # LR Model
+  
+  meanCoeffBiasInt <- modelMean$coefficients[1] - model$coefficients[1]
+  meanCoeffBiasSlp <- modelMean$coefficients[2] - model$coefficients[2]
+  
+  lrCoeffBiasInt <- modelLR$coefficients[1] - model$coefficients[1]
+  lrCoeffBiassSlp <- modelMean$coefficients[2] - model$coefficients[2]
+  
+  df <- data.frame(meanMSE, lrMSE,
+                   meanBias, lrBias,
+                   meanVarDiff, lrVarDiff,
+                   meanCorrel, lrCorrel,
+                   meanCoeffBiasInt, lrCoeffBiasInt,
+                   meanCoeffBiasSlp, lrCoeffBiassSlp)
+  
+  # Results
+  if(results == TRUE){
+    cat(
+      "\n---- MSE of Metrics ----",
+      "\n================",
+      "\nMean MSE: ", meanMSE,
+      "\nLR MSE: ", lrMSE,
+      "\n================",
+      "\nMean Bias: ", meanBias,
+      "\nLR Bias: ", lrBias,
+      "\n================",
+      "\nMean Variance Difference: ", meanVarDiff,
+      "\nLR Varicance Difference: ", lrVarDiff,
+      "\n================",
+      "\nMean Correlation: ", meanCorrel,
+      "\nLR Correlation: ", lrCorrel,
+      "\n================",
+      "\nMean Intercept Bias: ", meanCoeffBiasInt,
+      "\nLR Intercept Bias: ", lrCoeffBiasInt,
+      "\n================",
+      "\nMean Slope Bias: ", meanCoeffBiasSlp,
+      "\nLR Slope Bias: ", lrCoeffBiassSlp
+    )
+  }
+  return(df)
+}
+
+df <- comparison(meanImp, lrImp, x, y, modelImp, indexes)
+```
+
+We see the mean MSE is much less for the linear regression imputation. Remember this MSE is for the imputed values only. We see an almost compounded bias in the mean imputation mse as there is a constant imputed value. The bias for the mean imputation is twice as large as the regression imputation. The variance is interesting. The difference in the variances are large. We want the difference between the variance of the true y and the imputed y to be 0. We see the imputed values are much closer to zero than the mean variance. The lr imputation is 1% away from the true correlation while the mean correlation caused a large dip in the correlation. The coefficients show a small difference in bias.
+
+Let's run a Monte Carlo Simulation on these Data
+
+We will run 1000 simulations of imputation and anylize the MSE, Bias, Variance Difference, and Correlation
+
+```{r}
+iterations <- 1000
+mseMean <- numeric(iterations)
+mseLR <- numeric(iterations)
+biasMean <- numeric(iterations)
+biasLR <- numeric(iterations)
+varMean <- numeric(iterations)
+varLR <- numeric(iterations)
+corrMean <- numeric(iterations)
+corrLR <- numeric(iterations)
+
+for(i in 1:iterations){
+  n <- 1000 # Sample Size
+  m <- 3 # Slope
+  x <- rnorm(n)
+  b <- rnorm(n, mean = 4, sd = 1) # Intercept
+  y <- m * x + b
+  model <- lm(y ~ x)
+  
+  # Remove 25% of Data
+  percRem <- 0.25 # Percent Removed
+  indexes <- sample(c(1:n), size = n * percRem) # Indexes to Remove
+  newY <- y
+  newY[indexes] <- NA
+
+  # Imputation
+  meanImp <- newY
+  lrImp <- newY
+
+  # Mean Imputation
+  meanImp[indexes] <- mean(meanImp, na.rm = T) # <--------------------------------------
+
+  # Linear Regression Imputation
+  modelImp <- lm(lrImp ~ x)
+  lrImp[indexes] <- modelImp$coefficients[1] + modelImp$coefficients[2] * x[indexes] # <-----
+  
+  df <- comparison(meanImp, lrImp, x, y, modelImp, indexes, results = FALSE)
+  
+  # Append Vectors
+  mseMean[i] <- df$meanMSE
+  mseLR[i] <- df$lrMSE 
+  biasMean[i] <- df$meanBias
+  biasLR[i] <- df$lrBias
+  varMean[i] <- df$meanVarDiff
+  varLR[i] <- df$lrVarDiff
+  corrMean[i] <- df$meanCorrel
+  corrLR[i] <- df$lrCorrel
+  
+}
+```
+
+
+```{r}
+# Results
+cat(
+  "\nMSE Mean Bias: ", mean(mseMean^2),
+  "\nMSE LR Bias: ", mean(mseLR^2),
+  "\n=========================",
+  "\nMSE Mean Bias: ", mean(biasMean^2),
+  "\nMSE LR Bias: ", mean(biasLR^2),
+  "\n=========================",
+  "\nMSE Mean Variance Difference: ", mean(varMean^2),
+  "\nMSE LR Variance Difference: ", mean(varLR^2),
+  "\n=========================",
+  "\nMSE Mean Correlation: ", mean((corrMean - trueCorr)^2),
+  "\nMSE LR Correlation: ", mean((corrLR - trueCorr)^2)
+)
+
+# MSE Plot
+plot(mseMean, main = "MSE Comparison", ylab = "Mean Squared Error", ylim = c(-1,14))
+points(mseLR, lty = 7, col = "blue")
+abline(h = 0, lty = 2, col = "red")
+
+# Bias Plot
+plot(biasMean, main = "Bias Comparison", ylab = "Bias")
+points(biasLR, lty = 7, col = "blue")
+abline(h = 0, lty = 2, col = "red")
+
+# Variance Plot
+plot(varMean, main = "Variance Difference Comparison", ylab = "Variance Diff.", ylim = c(-3.5,1))
+points(varLR, lty = 7, col = "blue")
+abline(h = 0, lty = 2, col = "red")
+
+# Correlation Plot
+plot(corrMean, main = "Correlation Comparison", ylab = "Correlation", ylim = c(0.75,1))
+points(corrLR, lty = 7, col = "blue")
+abline(h = trueCorr, lty = 2, col = "red")
+```
+
